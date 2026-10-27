@@ -61,3 +61,77 @@ export const sleep = (ms) =>
 - The query is interpolated into the URL as-is. Wrap it in `encodeURIComponent(query)` if it can contain spaces or special characters (not in the original file).
 - The error message is the same generic string everywhere; it doesn't include the HTTP status.
 - Names `things`/`searchThings`/`getThing` are placeholders; swap in your own resource names and endpoint paths.
+
+## Whole file, assembled
+How `api.js` looks with the pieces above together (types removed):
+```javascript
+const BASE = "https://dummyjson.com";
+
+export async function searchThings(query) {
+  const res = await fetch(`${BASE}/things/search?q=${query}`);
+  if (!res.ok) {
+    throw new Error("Failed to fetch results!");
+  }
+  const data = await res.json();
+  return data.things;
+}
+
+export async function getThing(id) {
+  const res = await fetch(`${BASE}/things/${id}`);
+  if (!res.ok) {
+    throw new Error("Failed to fetch results!");
+  }
+  return res.json();
+}
+
+export async function getCategories() {
+  const res = await fetch(`${BASE}/things/category-list`);
+  if (!res.ok) {
+    throw new Error("Failed to fetch results!");
+  }
+  return res.json();
+}
+
+export const sleep = (ms) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+```
+
+## Consuming it in a component
+From `App.tsx` (types removed). Import the function, hold the result in state, and call it from an effect:
+```javascript
+import { useEffect, useState } from "react";
+import { searchThings } from "./api";
+
+export default function App() {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+
+  useEffect(() => {
+    searchThings(query).then(setResults);
+  }, [query]);
+
+  return (
+    <div>
+      <input
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+        }}
+      />
+      <ul>
+        {results.map((p) => (
+          <li key={p.id}>{p.title}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+Consumer gotcha: since `api.js` throws on `!res.ok`, the call above has no `.catch`, so a failure becomes an unhandled promise rejection and the UI shows nothing. The original `App.tsx` has this same gap. Handling it (not in the original file):
+```javascript
+useEffect(() => {
+  searchThings(query).then(setResults).catch((err) => console.error(err));
+}, [query]);
+```
+Next step from there is `error`/`loading` state (see `PRACTICE.md`, exercise 1).
